@@ -151,10 +151,18 @@ def game_detail(game_id):
     # Get current lineup for this game
     current_positions = PlayerPosition.query.filter_by(game_id=game_id).all()
 
+    # Convert players to JSON-serializable format
+    players_json = [{'id': p.id, 'name': p.name} for p in all_players]
+
+    # Convert positions to JSON-serializable format
+    positions_json = [{'player_id': p.player_id, 'position': p.position} for p in current_positions]
+
     return render_template('game_detail.html',
                          game=game,
                          players=all_players,
-                         current_positions=current_positions)
+                         players_json=players_json,
+                         current_positions=current_positions,
+                         positions_json=positions_json)
 
 
 @app.route('/games/<int:game_id>/lineup', methods=['POST'])

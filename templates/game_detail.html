@@ -176,8 +176,8 @@
 <script>
 // Update pitch visualization when lineup is set
 document.addEventListener('DOMContentLoaded', function() {
-    const positions = {{ current_positions | tojson | safe }};
-    const players = {{ players | tojson | safe }};
+    const positions = {{ positions_json | tojson | safe }};
+    const players = {{ players_json | tojson | safe }};
 
     // Create player lookup
     const playerMap = {};
