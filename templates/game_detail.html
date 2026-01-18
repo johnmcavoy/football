@@ -29,11 +29,28 @@
     </div>
 </div>
 
+<!-- Quick Actions -->
+<div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 style="margin: 0; color: white;">⚡ Quick Actions</h3>
+            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Generate a fair game plan automatically</p>
+        </div>
+        <div>
+            <a href="{{ url_for('auto_plan_game', game_id=game.id) }}" class="btn btn-primary" style="background: white; color: #667eea; margin-right: 10px;">
+                🎯 Auto-Generate Game Plan
+            </a>
+            <a href="{{ url_for('recommend_subs', game_id=game.id) }}" class="btn btn-secondary" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid white;">
+                📋 Manual Substitutions
+            </a>
+        </div>
+    </div>
+</div>
+
 <!-- Pitch Visualization -->
 <div class="card">
     <div class="card-header">
-        Team Lineup
-        <a href="{{ url_for('recommend_subs', game_id=game.id) }}" class="btn btn-primary btn-small" style="float: right;">Substitution Recommendations</a>
+        Current Team Lineup
     </div>
 
     <div class="pitch-container">

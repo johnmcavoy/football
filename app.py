@@ -224,6 +224,171 @@ def recommend_subs(game_id):
                          recommendations=recommendations)
 
 
+@app.route('/games/<int:game_id>/auto-plan', methods=['GET', 'POST'])
+def auto_plan_game(game_id):
+    """Automatically generate a fair rotation plan for the entire game"""
+    game = Game.query.get_or_404(game_id)
+    all_players = Player.query.filter_by(active=True).all()
+
+    if request.method == 'POST':
+        # Save the rotation plan to the database
+        # Clear existing positions for this game
+        PlayerPosition.query.filter_by(game_id=game_id).delete()
+
+        # Get the plan data from the form
+        import json
+        plan_data = json.loads(request.form.get('plan_data', '[]'))
+
+        for rotation in plan_data:
+            stint = rotation['stint']
+            for pos_key, player_id in rotation['positions'].items():
+                if player_id:
+                    position = PlayerPosition(
+                        game_id=game_id,
+                        player_id=int(player_id),
+                        position=pos_key,
+                        stint_number=stint,
+                        minutes_played=rotation['duration']
+                    )
+                    db.session.add(position)
+
+        db.session.commit()
+        return redirect(url_for('game_detail', game_id=game_id))
+
+    # GET request - generate the plan
+    num_players = len(all_players)
+    if num_players < 5:
+        return render_template('auto_plan.html',
+                             game=game,
+                             error="You need at least 5 active players to generate a rotation plan")
+
+    # Calculate player stats for fairness
+    player_stats = {}
+    for player in all_players:
+        total_minutes = db.session.query(db.func.sum(PlayerPosition.minutes_played))\
+            .filter_by(player_id=player.id).scalar() or 0
+
+        # Count how many times they've played each position
+        position_history = {}
+        position_counts = db.session.query(
+            PlayerPosition.position,
+            db.func.count(PlayerPosition.id)
+        ).filter_by(player_id=player.id).group_by(PlayerPosition.position).all()
+
+        for pos, count in position_counts:
+            position_history[pos] = count
+
+        player_stats[player.id] = {
+            'player': player,
+            'total_minutes': total_minutes,
+            'position_history': position_history,
+            'times_on_pitch': 0  # Track for this game plan
+        }
+
+    # Generate rotation plan
+    # For 5-a-side, we need 5 players on at a time
+    # Standard game is 40 minutes, we'll create rotations every 10 minutes
+    game_duration = 40  # minutes
+    rotation_interval = 10  # minutes
+    num_rotations = game_duration // rotation_interval
+    positions = ['GK', 'DEF1', 'DEF2', 'MID', 'ATT']
+
+    rotation_plan = []
+
+    # Track which players have played which positions in THIS game
+    game_position_tracker = {p.id: {pos: 0 for pos in positions} for p in all_players}
+
+    for stint in range(1, num_rotations + 1):
+        rotation = {
+            'stint': stint,
+            'start_time': (stint - 1) * rotation_interval,
+            'end_time': stint * rotation_interval,
+            'duration': rotation_interval,
+            'positions': {}
+        }
+
+        # Sort players by who needs playing time most
+        available_players = sorted(
+            all_players,
+            key=lambda p: (
+                player_stats[p.id]['total_minutes'],  # Historical minutes (lower is better)
+                player_stats[p.id]['times_on_pitch']  # Times in this game (lower is better)
+            )
+        )
+
+        # Assign positions for this rotation
+        assigned_players = []
+
+        # First, assign goalkeeper - prioritize those who prefer it and haven't played it much
+        gk_candidates = sorted(
+            available_players,
+            key=lambda p: (
+                not p.prefers_goal,  # Prefer those who like goal
+                game_position_tracker[p.id]['GK'],  # Haven't played GK in this game
+                player_stats[p.id]['position_history'].get('GK', 0)  # Historical GK time
+            )
+        )
+        rotation['positions']['GK'] = gk_candidates[0].id
+        assigned_players.append(gk_candidates[0].id)
+        player_stats[gk_candidates[0].id]['times_on_pitch'] += 1
+        game_position_tracker[gk_candidates[0].id]['GK'] += 1
+
+        # Assign other positions
+        for position in ['DEF1', 'DEF2', 'MID', 'ATT']:
+            # Get players not yet assigned in this rotation
+            position_candidates = [p for p in available_players if p.id not in assigned_players]
+
+            # Sort by who needs this position most
+            position_candidates = sorted(
+                position_candidates,
+                key=lambda p: (
+                    game_position_tracker[p.id].get(position, 0),  # Haven't played this position in game
+                    player_stats[p.id]['position_history'].get(position, 0),  # Historical position count
+                    player_stats[p.id]['total_minutes']  # Overall minutes
+                )
+            )
+
+            if position_candidates:
+                selected = position_candidates[0]
+                rotation['positions'][position] = selected.id
+                assigned_players.append(selected.id)
+                player_stats[selected.id]['times_on_pitch'] += 1
+                game_position_tracker[selected.id][position] += 1
+
+        rotation_plan.append(rotation)
+
+    # Calculate bench periods for each player
+    player_summary = []
+    for player in all_players:
+        stints_playing = sum(1 for r in rotation_plan
+                            if player.id in r['positions'].values())
+        minutes_playing = stints_playing * rotation_interval
+        minutes_benched = game_duration - minutes_playing
+
+        # Get positions they'll play
+        positions_playing = []
+        for rotation in rotation_plan:
+            for pos, pid in rotation['positions'].items():
+                if pid == player.id:
+                    positions_playing.append(f"{pos} ({rotation['start_time']}-{rotation['end_time']}min)")
+
+        player_summary.append({
+            'player': player,
+            'minutes_playing': minutes_playing,
+            'minutes_benched': minutes_benched,
+            'stints': stints_playing,
+            'positions': positions_playing,
+            'fairness_score': 'Fair' if minutes_playing >= game_duration * 0.4 else 'Needs More Time'
+        })
+
+    return render_template('auto_plan.html',
+                         game=game,
+                         rotation_plan=rotation_plan,
+                         player_summary=player_summary,
+                         all_players=all_players,
+                         game_duration=game_duration)
+
+
 @app.route('/statistics')
 def statistics():
     """Show fairness statistics"""

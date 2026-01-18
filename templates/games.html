@@ -47,6 +47,9 @@
                 </td>
                 <td>
                     <a href="{{ url_for('game_detail', game_id=game.id) }}" class="btn btn-secondary btn-small">View Details</a>
+                    {% if not game.completed %}
+                    <a href="{{ url_for('auto_plan_game', game_id=game.id) }}" class="btn btn-primary btn-small" style="margin-left: 5px;">🎯 Auto-Plan</a>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}

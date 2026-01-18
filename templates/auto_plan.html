@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Auto Game Plan - Football Team Manager{% endblock %}
+{% block page_title %}Automatic Rotation Plan{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Game Plan: {{ game.opponent }}</h1>
+    <p>{{ game.date.strftime('%A, %B %d, %Y at %H:%M') }}</p>
+</div>
+
+{% if error %}
+<div class="card" style="background: #fff4e6; border-left: 3px solid var(--warning-color);">
+    <strong>⚠️ {{ error }}</strong>
+</div>
+{% else %}
+
+<!-- Summary Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ rotation_plan | length }}</div>
+        <div class="stat-label">Rotation Periods</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ game_duration }}</div>
+        <div class="stat-label">Total Minutes</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ all_players | length }}</div>
+        <div class="stat-label">Players Available</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ (game_duration / all_players|length) | round(1) }}</div>
+        <div class="stat-label">Avg Minutes/Player</div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div style="margin-bottom: 20px;">
+    <form method="POST" id="save-plan-form">
+        <input type="hidden" name="plan_data" id="plan-data-input" value="">
+        <button type="submit" class="btn btn-primary" style="margin-right: 10px;">💾 Save This Plan</button>
+        <a href="{{ url_for('game_detail', game_id=game.id) }}" class="btn btn-secondary">Cancel</a>
+        <button type="button" class="btn btn-secondary" onclick="window.location.reload()" style="margin-left: 10px;">🔄 Generate New Plan</button>
+    </form>
+</div>
+
+<!-- Player Summary -->
+<div class="card">
+    <div class="card-header">Player Summary - Fair Distribution</div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Minutes Playing</th>
+                <th>Minutes Benched</th>
+                <th>Stints</th>
+                <th>Positions & Times</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for summary in player_summary | sort(attribute='minutes_playing', reverse=True) %}
+            <tr>
+                <td><strong>{{ summary.player.name }}</strong></td>
+                <td><strong style="color: var(--success-color);">{{ summary.minutes_playing }} min</strong></td>
+                <td>{{ summary.minutes_benched }} min</td>
+                <td>{{ summary.stints }}</td>
+                <td style="font-size: 12px;">
+                    {% for pos in summary.positions %}
+                        <div><span class="badge badge-warning">{{ pos }}</span></div>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if summary.minutes_playing >= game_duration * 0.4 %}
+                        <span class="badge badge-success">✓ Fair</span>
+                    {% else %}
+                        <span class="badge badge-warning">Review</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Timeline Visualization -->
+<div class="card">
+    <div class="card-header">Game Timeline - When to Substitute</div>
+
+    <div style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 4px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            {% for rotation in rotation_plan %}
+            <div style="flex: 1; text-align: center; padding: 10px; background: var(--secondary-color); color: white; border-radius: 4px; font-weight: bold;">
+                {{ rotation.start_time }}-{{ rotation.end_time }} min
+            </div>
+            {% endfor %}
+        </div>
+        <div style="font-size: 13px; color: #666; text-align: center; margin-top: 10px;">
+            <strong>📢 Substitution Times:</strong>
+            {% for rotation in rotation_plan %}
+                {% if loop.index > 1 %}
+                    <span style="margin: 0 10px;">⏰ {{ rotation.start_time }} minutes</span>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Rotation Details with Mini Pitches -->
+{% for rotation in rotation_plan %}
+<div class="card">
+    <div class="card-header">
+        Rotation {{ rotation.stint }}: Minutes {{ rotation.start_time }}-{{ rotation.end_time }}
+        {% if rotation.stint == 1 %}
+            <span class="badge badge-success" style="margin-left: 10px;">Starting Lineup</span>
+        {% else %}
+            <span class="badge badge-warning" style="margin-left: 10px;">⏰ Sub at {{ rotation.start_time }} min</span>
+        {% endif %}
+    </div>
+
+    <div class="pitch-container" style="padding: 15px;">
+        <div class="pitch" style="min-height: 300px;">
+            <div class="pitch-line center-line"></div>
+
+            <!-- Attack -->
+            <div class="position-row">
+                <div class="player-position">
+                    <div class="position-label">ATTACKER</div>
+                    <div class="player-name">
+                        {% for player in all_players %}
+                            {% if player.id == rotation.positions.get('ATT') %}{{ player.name }}{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Midfield & Defense -->
+            <div class="position-row">
+                <div class="player-position">
+                    <div class="position-label">MIDFIELDER</div>
+                    <div class="player-name">
+                        {% for player in all_players %}
+                            {% if player.id == rotation.positions.get('MID') %}{{ player.name }}{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="player-position">
+                    <div class="position-label">DEFENDER</div>
+                    <div class="player-name">
+                        {% for player in all_players %}
+                            {% if player.id == rotation.positions.get('DEF1') %}{{ player.name }}{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="player-position">
+                    <div class="position-label">DEFENDER</div>
+                    <div class="player-name">
+                        {% for player in all_players %}
+                            {% if player.id == rotation.positions.get('DEF2') %}{{ player.name }}{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Goalkeeper -->
+            <div class="position-row">
+                <div class="player-position goalkeeper">
+                    <div class="position-label" style="color: white;">GOALKEEPER</div>
+                    <div class="player-name">
+                        {% for player in all_players %}
+                            {% if player.id == rotation.positions.get('GK') %}{{ player.name }}{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Players on Bench for this rotation -->
+    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <strong>🪑 On Bench:</strong>
+        {% set on_pitch_ids = rotation.positions.values() | list %}
+        {% for player in all_players %}
+            {% if player.id not in on_pitch_ids %}
+                <span style="margin: 0 10px; color: #666;">{{ player.name }}</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<!-- Coaching Tips -->
+<div class="card">
+    <div class="card-header">💡 Coaching Tips</div>
+    <ul style="padding-left: 20px; line-height: 1.8;">
+        <li><strong>Pre-Game:</strong> Print this plan and bring it to the game for easy reference</li>
+        <li><strong>Communication:</strong> Let players know ahead of time when they'll play and which positions</li>
+        <li><strong>Timing:</strong> Use a stopwatch or timer to track rotation intervals accurately</li>
+        <li><strong>Flexibility:</strong> Adjust if needed based on game situation, but try to maintain fairness</li>
+        <li><strong>Substitution Process:</strong> Make subs during stoppages in play for smooth transitions</li>
+        <li><strong>Warm-up:</strong> Have bench players warm up 1-2 minutes before their rotation</li>
+    </ul>
+</div>
+
+<script>
+// Save plan data for form submission
+document.getElementById('save-plan-form').addEventListener('submit', function(e) {
+    const planData = {{ rotation_plan | tojson | safe }};
+    document.getElementById('plan-data-input').value = JSON.stringify(planData);
+});
+</script>
+
+{% endif %}
+{% endblock %}
