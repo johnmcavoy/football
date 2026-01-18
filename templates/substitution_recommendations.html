@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Substitution Recommendations - Football Team Manager{% endblock %}
+{% block page_title %}Substitution Recommendations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Substitution Recommendations</h1>
+    <p>For game vs {{ game.opponent }} on {{ game.date.strftime('%Y-%m-%d') }}</p>
+</div>
+
+<div class="card">
+    <div class="card-header">Fairness-Based Recommendations</div>
+    <p style="color: #666; margin-bottom: 20px;">
+        Players are recommended for substitution based on total playing time and position variety to ensure fairness.
+        Players with less playing time should be prioritized.
+    </p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Priority</th>
+                <th>Player</th>
+                <th>Total Minutes Played</th>
+                <th>Positions Played</th>
+                <th>Recommendation</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for player_id, stats in recommendations[:10] %}
+            <tr>
+                <td>
+                    {% if loop.index <= 3 %}
+                    <span class="badge badge-success">High</span>
+                    {% elif loop.index <= 6 %}
+                    <span class="badge badge-warning">Medium</span>
+                    {% else %}
+                    <span class="badge">Low</span>
+                    {% endif %}
+                </td>
+                <td><strong>{{ stats.player.name }}</strong></td>
+                <td>{{ stats.total_minutes }} min</td>
+                <td>
+                    {% if stats.position_counts %}
+                        {% for pos, count in stats.position_counts.items() %}
+                            <span class="badge">{{ pos }}: {{ count }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span style="color: #666;">No positions yet</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if loop.index <= 3 %}
+                        <strong style="color: var(--success-color);">Should play more</strong>
+                    {% elif loop.index <= 6 %}
+                        Moderate playing time
+                    {% else %}
+                        Has played often
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="card-header">Substitution Tips</div>
+    <ul style="padding-left: 20px; line-height: 1.8;">
+        <li><strong>Fair Rotation:</strong> Prioritize players with the least playing time to ensure everyone gets equal opportunities</li>
+        <li><strong>Position Variety:</strong> Try to give players experience in different positions throughout the season</li>
+        <li><strong>Timing:</strong> For a typical 40-minute game, consider substitutions at 10, 20, and 30 minutes</li>
+        <li><strong>Energy Levels:</strong> Rotate players showing signs of fatigue to maintain team performance</li>
+        <li><strong>Goalkeeper Preference:</strong> Players marked with 🥅 prefer playing in goal - try to accommodate their preference</li>
+    </ul>
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="{{ url_for('game_detail', game_id=game.id) }}" class="btn btn-primary">Back to Game</a>
+    <a href="{{ url_for('statistics') }}" class="btn btn-secondary" style="margin-left: 10px;">View Full Statistics</a>
+</div>
+{% endblock %}

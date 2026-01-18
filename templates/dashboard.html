@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Football Team Manager{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Overview of your 5-a-side team</p>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_players }}</div>
+        <div class="stat-label">Active Players</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ total_games }}</div>
+        <div class="stat-label">Total Games</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ upcoming_games|length }}</div>
+        <div class="stat-label">Upcoming Games</div>
+    </div>
+</div>
+
+<!-- Upcoming Games -->
+<div class="card">
+    <div class="card-header">
+        Upcoming Games
+        <a href="{{ url_for('add_game') }}" class="btn btn-primary btn-small" style="float: right;">Schedule Game</a>
+    </div>
+    {% if upcoming_games %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Opponent</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for game in upcoming_games %}
+            <tr>
+                <td>{{ game.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ game.opponent }}</td>
+                <td>
+                    <a href="{{ url_for('game_detail', game_id=game.id) }}" class="btn btn-secondary btn-small">Manage Lineup</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; padding: 20px 0;">No upcoming games scheduled. <a href="{{ url_for('add_game') }}">Schedule one now</a>!</p>
+    {% endif %}
+</div>
+
+<!-- Top Scorers -->
+<div class="card">
+    <div class="card-header">Top Scorers</div>
+    {% if top_scorers %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Goals</th>
+                <th>Skill Rating</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for player in top_scorers %}
+            <tr>
+                <td>{{ player.name }}</td>
+                <td><strong>{{ player.total_goals }}</strong></td>
+                <td>
+                    <div class="skill-rating">
+                        {% for i in range(player.skill_rating) %}
+                        <span class="skill-rating-star">★</span>
+                        {% endfor %}
+                        {% for i in range(10 - player.skill_rating) %}
+                        <span class="skill-rating-star empty">★</span>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; padding: 20px 0;">No players yet. <a href="{{ url_for('add_player') }}">Add players</a> to get started!</p>
+    {% endif %}
+</div>
+{% endblock %}

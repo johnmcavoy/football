@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule Game - Football Team Manager{% endblock %}
+{% block page_title %}Schedule Game{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Schedule New Game</h1>
+    <p>Add a game to your schedule</p>
+</div>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('add_game') }}">
+        <div class="form-group">
+            <label class="form-label" for="date">Game Date & Time *</label>
+            <input type="datetime-local" id="date" name="date" class="form-input" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="opponent">Opponent</label>
+            <input type="text" id="opponent" name="opponent" class="form-input" placeholder="e.g., Blue Tigers FC" value="Friendly Match">
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn btn-primary">Schedule Game</button>
+            <a href="{{ url_for('games') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

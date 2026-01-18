@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Game Details - Football Team Manager{% endblock %}
+{% block page_title %}Game vs {{ game.opponent }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ game.opponent }}</h1>
+    <p>{{ game.date.strftime('%A, %B %d, %Y at %H:%M') }}</p>
+</div>
+
+<!-- Game Info -->
+<div class="card">
+    <div class="card-header">Game Information</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+        <div>
+            <strong>Status:</strong>
+            {% if game.completed %}
+            <span class="badge badge-success">Completed</span>
+            {% else %}
+            <span class="badge badge-warning">Upcoming</span>
+            {% endif %}
+        </div>
+        {% if game.completed %}
+        <div>
+            <strong>Final Score:</strong> {{ game.our_score }} - {{ game.their_score }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pitch Visualization -->
+<div class="card">
+    <div class="card-header">
+        Team Lineup
+        <a href="{{ url_for('recommend_subs', game_id=game.id) }}" class="btn btn-primary btn-small" style="float: right;">Substitution Recommendations</a>
+    </div>
+
+    <div class="pitch-container">
+        <div class="pitch">
+            <!-- Center line -->
+            <div class="pitch-line center-line"></div>
+
+            <!-- Attack -->
+            <div class="position-row">
+                <div class="player-position">
+                    <div class="position-label">ATTACKER</div>
+                    <div class="player-name" id="att-name">-</div>
+                </div>
+            </div>
+
+            <!-- Midfield & Defense -->
+            <div class="position-row">
+                <div class="player-position">
+                    <div class="position-label">MIDFIELDER</div>
+                    <div class="player-name" id="mid-name">-</div>
+                </div>
+                <div class="player-position">
+                    <div class="position-label">DEFENDER</div>
+                    <div class="player-name" id="def1-name">-</div>
+                </div>
+                <div class="player-position">
+                    <div class="position-label">DEFENDER</div>
+                    <div class="player-name" id="def2-name">-</div>
+                </div>
+            </div>
+
+            <!-- Goalkeeper -->
+            <div class="position-row">
+                <div class="player-position goalkeeper">
+                    <div class="position-label" style="color: white;">GOALKEEPER</div>
+                    <div class="player-name" id="gk-name">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Set Lineup -->
+<div class="card">
+    <div class="card-header">Set Starting Lineup</div>
+
+    <form method="POST" action="{{ url_for('set_lineup', game_id=game.id) }}">
+        <input type="hidden" name="stint" value="1">
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <div class="form-group">
+                <label class="form-label" for="GK">Goalkeeper</label>
+                <select id="GK" name="GK" class="form-select">
+                    <option value="">- Select Player -</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}" {% if player.prefers_goal %}style="font-weight: bold;"{% endif %}>
+                        {{ player.name }}{% if player.prefers_goal %} 🥅{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="DEF1">Defender 1</label>
+                <select id="DEF1" name="DEF1" class="form-select">
+                    <option value="">- Select Player -</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="DEF2">Defender 2</label>
+                <select id="DEF2" name="DEF2" class="form-select">
+                    <option value="">- Select Player -</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="MID">Midfielder</label>
+                <select id="MID" name="MID" class="form-select">
+                    <option value="">- Select Player -</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="ATT">Attacker</label>
+                <select id="ATT" name="ATT" class="form-select">
+                    <option value="">- Select Player -</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button type="submit" class="btn btn-primary">Set Lineup</button>
+            <a href="{{ url_for('games') }}" class="btn btn-secondary" style="margin-left: 10px;">Back to Games</a>
+        </div>
+    </form>
+</div>
+
+<!-- Current Positions (if any) -->
+{% if current_positions %}
+<div class="card">
+    <div class="card-header">Player Assignments</div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Position</th>
+                <th>Stint</th>
+                <th>Minutes</th>
+                <th>Goals</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pos in current_positions %}
+            <tr>
+                <td>{{ pos.player.name }}</td>
+                <td><span class="badge badge-warning">{{ pos.position }}</span></td>
+                <td>{{ pos.stint_number }}</td>
+                <td>{{ pos.minutes_played }}</td>
+                <td>{{ pos.goals_scored }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<script>
+// Update pitch visualization when lineup is set
+document.addEventListener('DOMContentLoaded', function() {
+    const positions = {{ current_positions | tojson | safe }};
+    const players = {{ players | tojson | safe }};
+
+    // Create player lookup
+    const playerMap = {};
+    players.forEach(p => {
+        playerMap[p.id] = p.name;
+    });
+
+    // Update pitch
+    if (positions && positions.length > 0) {
+        positions.forEach(pos => {
+            const playerName = playerMap[pos.player_id];
+            if (pos.position === 'GK') {
+                document.getElementById('gk-name').textContent = playerName || '-';
+            } else if (pos.position === 'DEF1') {
+                document.getElementById('def1-name').textContent = playerName || '-';
+            } else if (pos.position === 'DEF2') {
+                document.getElementById('def2-name').textContent = playerName || '-';
+            } else if (pos.position === 'MID') {
+                document.getElementById('mid-name').textContent = playerName || '-';
+            } else if (pos.position === 'ATT') {
+                document.getElementById('att-name').textContent = playerName || '-';
+            }
+        });
+    }
+
+    // Live update when selecting players
+    const selects = ['GK', 'DEF1', 'DEF2', 'MID', 'ATT'];
+    selects.forEach(pos => {
+        const select = document.getElementById(pos);
+        if (select) {
+            select.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const playerName = selectedOption.text.replace(' 🥅', '');
+                const displayId = pos === 'GK' ? 'gk-name' :
+                                 pos === 'DEF1' ? 'def1-name' :
+                                 pos === 'DEF2' ? 'def2-name' :
+                                 pos === 'MID' ? 'mid-name' : 'att-name';
+                document.getElementById(displayId).textContent = this.value ? playerName : '-';
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

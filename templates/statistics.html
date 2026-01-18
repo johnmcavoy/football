@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - Football Team Manager{% endblock %}
+{% block page_title %}Statistics & Fairness{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Statistics & Fairness</h1>
+    <p>Track playing time, positions, and goals to ensure fair opportunities for all players</p>
+</div>
+
+<div class="card">
+    <div class="card-header">Playing Time Analysis</div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Total Minutes</th>
+                <th>GK</th>
+                <th>DEF</th>
+                <th>MID</th>
+                <th>ATT</th>
+                <th>Goals</th>
+                <th>Fairness Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set total_minutes_list = [] %}
+            {% for stat in stats %}
+                {% set _ = total_minutes_list.append(stat.total_minutes) %}
+            {% endfor %}
+            {% set avg_minutes = (total_minutes_list | sum) / (total_minutes_list | length) if total_minutes_list else 0 %}
+
+            {% for stat in stats %}
+            <tr>
+                <td><strong>{{ stat.player.name }}</strong></td>
+                <td>
+                    <strong>{{ stat.total_minutes }}</strong> min
+                    {% if stat.total_minutes < avg_minutes * 0.8 %}
+                        <span style="color: var(--danger-color); margin-left: 5px;">↓</span>
+                    {% elif stat.total_minutes > avg_minutes * 1.2 %}
+                        <span style="color: var(--warning-color); margin-left: 5px;">↑</span>
+                    {% endif %}
+                </td>
+                <td>{{ stat.positions.get('GK', 0) }} min</td>
+                <td>{{ (stat.positions.get('DEF1', 0) + stat.positions.get('DEF2', 0)) }} min</td>
+                <td>{{ stat.positions.get('MID', 0) }} min</td>
+                <td>{{ stat.positions.get('ATT', 0) }} min</td>
+                <td><strong>{{ stat.total_goals }}</strong></td>
+                <td>
+                    {% if stat.total_minutes < avg_minutes * 0.8 %}
+                        <span class="badge badge-danger">Needs More Time</span>
+                    {% elif stat.total_minutes > avg_minutes * 1.2 %}
+                        <span class="badge badge-warning">Above Average</span>
+                    {% else %}
+                        <span class="badge badge-success">Fair</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if avg_minutes > 0 %}
+    <div style="margin-top: 20px; padding: 15px; background: #f0f8ff; border-left: 3px solid var(--secondary-color);">
+        <strong>Average Playing Time:</strong> {{ "%.0f" | format(avg_minutes) }} minutes per player
+        <br>
+        <span style="font-size: 13px; color: #666;">
+            Players below 80% ({{ "%.0f" | format(avg_minutes * 0.8) }} min) need more playing time.
+            Players above 120% ({{ "%.0f" | format(avg_minutes * 1.2) }} min) have played significantly more than average.
+        </span>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">Position Distribution</div>
+    <p style="color: #666; margin-bottom: 20px;">
+        Ensure each player gets experience in various positions for balanced development.
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+        {% for stat in stats %}
+        <div style="background: #fafafa; padding: 15px; border-radius: 4px;">
+            <div style="font-weight: 600; margin-bottom: 10px;">{{ stat.player.name }}</div>
+            <div style="font-size: 13px;">
+                {% if stat.positions %}
+                    {% for pos, minutes in stat.positions.items() %}
+                        <div style="margin: 5px 0;">
+                            <span class="badge badge-warning">{{ pos }}</span>
+                            <span style="margin-left: 5px;">{{ minutes }} min</span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <span style="color: #999;">No games played yet</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Top Scorers</div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th>Goals</th>
+                <th>Minutes Played</th>
+                <th>Goals per Game</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stat in stats | sort(attribute='total_goals', reverse=True) %}
+            {% if stat.total_goals > 0 %}
+            <tr>
+                <td>
+                    {% if loop.index == 1 %}🥇
+                    {% elif loop.index == 2 %}🥈
+                    {% elif loop.index == 3 %}🥉
+                    {% else %}{{ loop.index }}
+                    {% endif %}
+                </td>
+                <td><strong>{{ stat.player.name }}</strong></td>
+                <td><strong style="color: var(--secondary-color);">{{ stat.total_goals }}</strong></td>
+                <td>{{ stat.total_minutes }} min</td>
+                <td>
+                    {% if stat.total_minutes > 0 %}
+                        {{ "%.2f" | format((stat.total_goals / (stat.total_minutes / 40))) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="card-header">Fairness Recommendations</div>
+    <ul style="padding-left: 20px; line-height: 1.8;">
+        {% set needs_time = [] %}
+        {% for stat in stats %}
+            {% if avg_minutes > 0 and stat.total_minutes < avg_minutes * 0.8 %}
+                {% set _ = needs_time.append(stat.player.name) %}
+            {% endif %}
+        {% endfor %}
+
+        {% if needs_time %}
+            <li><strong style="color: var(--danger-color);">Priority Players:</strong> {{ needs_time | join(', ') }} need more playing time in upcoming games</li>
+        {% else %}
+            <li><strong style="color: var(--success-color);">Great job!</strong> Playing time is fairly distributed across all players</li>
+        {% endif %}
+
+        <li><strong>Position Rotation:</strong> Try to give each player experience in at least 3 different positions throughout the season</li>
+        <li><strong>Regular Monitoring:</strong> Check these statistics before each game to plan fair substitutions</li>
+        <li><strong>Communication:</strong> Share these stats with parents to show your commitment to fair play</li>
+    </ul>
+</div>
+{% endblock %}

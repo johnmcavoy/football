@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Football Team Manager{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <div class="topbar">
+        <a href="{{ url_for('dashboard') }}" class="topbar-brand">
+            ⚽ Football Team Manager
+        </a>
+        <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <ul class="sidebar-nav">
+            <li>
+                <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <span class="icon">📊</span>
+                    Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('players') }}" class="{% if request.endpoint in ['players', 'add_player', 'edit_player'] %}active{% endif %}">
+                    <span class="icon">👥</span>
+                    Players
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('games') }}" class="{% if request.endpoint in ['games', 'add_game', 'game_detail'] %}active{% endif %}">
+                    <span class="icon">⚽</span>
+                    Games
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('statistics') }}" class="{% if request.endpoint == 'statistics' %}active{% endif %}">
+                    <span class="icon">📈</span>
+                    Statistics & Fairness
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

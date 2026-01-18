@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Add Player - Football Team Manager{% endblock %}
+{% block page_title %}Add Player{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Add New Player</h1>
+    <p>Add a player to your team roster</p>
+</div>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('add_player') }}">
+        <div class="form-group">
+            <label class="form-label" for="name">Player Name *</label>
+            <input type="text" id="name" name="name" class="form-input" required placeholder="e.g., John Smith">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="skill_rating">Skill Rating (1-10)</label>
+            <input type="number" id="skill_rating" name="skill_rating" class="form-input" min="1" max="10" value="5" required>
+            <p style="font-size: 13px; color: #666; margin-top: 5px;">Rate the player's overall ability from 1 (beginner) to 10 (expert)</p>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">
+                <input type="checkbox" name="prefers_goal" class="form-checkbox">
+                Prefers to play in goal
+            </label>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn btn-primary">Add Player</button>
+            <a href="{{ url_for('players') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

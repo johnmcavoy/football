@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Players - Football Team Manager{% endblock %}
+{% block page_title %}Players{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Players</h1>
+    <p>Manage your team roster</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        Team Roster
+        <a href="{{ url_for('add_player') }}" class="btn btn-primary btn-small" style="float: right;">Add Player</a>
+    </div>
+
+    {% if players %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Skill Rating</th>
+                <th>Prefers Goal</th>
+                <th>Total Goals</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for player in players %}
+            <tr>
+                <td><strong>{{ player.name }}</strong></td>
+                <td>
+                    <div class="skill-rating">
+                        {% for i in range(player.skill_rating) %}
+                        <span class="skill-rating-star">★</span>
+                        {% endfor %}
+                        {% for i in range(10 - player.skill_rating) %}
+                        <span class="skill-rating-star empty">★</span>
+                        {% endfor %}
+                        <span style="color: #666; margin-left: 8px; font-size: 13px;">{{ player.skill_rating }}/10</span>
+                    </div>
+                </td>
+                <td>
+                    {% if player.prefers_goal %}
+                    <span class="badge badge-warning">Yes 🥅</span>
+                    {% else %}
+                    <span class="badge">No</span>
+                    {% endif %}
+                </td>
+                <td>{{ player.total_goals }}</td>
+                <td>
+                    <a href="{{ url_for('edit_player', player_id=player.id) }}" class="btn btn-secondary btn-small">Edit</a>
+                    <form method="POST" action="{{ url_for('delete_player', player_id=player.id) }}" style="display: inline;">
+                        <button type="submit" class="btn btn-danger btn-small" onclick="return confirm('Are you sure you want to remove this player?')">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; padding: 20px 0;">No players added yet. <a href="{{ url_for('add_player') }}">Add your first player</a>!</p>
+    {% endif %}
+</div>
+{% endblock %}
