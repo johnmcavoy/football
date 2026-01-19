@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Player Availability - Football Team Manager{% endblock %}
+{% block page_title %}Player Availability{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Select Available Players</h1>
+    <p>{{ game.opponent }} - {{ game.date.strftime('%A, %B %d, %Y at %H:%M') }}</p>
+    <p style="color: #666; margin-top: 10px;">
+        Please select which players will be available for this game. Only selected players will be included in the rotation plan.
+    </p>
+</div>
+
+<div class="card">
+    <div class="card-header">Player Availability Selection</div>
+
+    <form method="POST">
+        <input type="hidden" name="availability" value="true">
+
+        <div style="margin-bottom: 20px; padding: 15px; background: #e8f4f8; border-left: 3px solid var(--secondary-color);">
+            <strong>ℹ️ Instructions:</strong>
+            <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                <li>Check the box next to each player who will be available to play</li>
+                <li>You need at least 5 players selected to generate a rotation plan</li>
+                <li>Players not selected won't be included in the fairness calculations for this game</li>
+            </ul>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">
+                        <input type="checkbox" id="select-all" style="cursor: pointer;">
+                    </th>
+                    <th>Player Name</th>
+                    <th>Skill Rating</th>
+                    <th>Prefers Goal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in players %}
+                <tr>
+                    <td>
+                        <input type="checkbox"
+                               name="player_{{ player.id }}"
+                               class="player-checkbox"
+                               checked
+                               style="cursor: pointer; width: 20px; height: 20px;">
+                    </td>
+                    <td><strong>{{ player.name }}</strong></td>
+                    <td>
+                        {% for i in range(player.skill_rating) %}
+                            ⭐
+                        {% endfor %}
+                        ({{ player.skill_rating }}/10)
+                    </td>
+                    <td>
+                        {% if player.prefers_goal %}
+                            <span class="badge badge-success">Yes 🧤</span>
+                        {% else %}
+                            <span class="badge badge-secondary">No</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 20px; padding: 15px; background: #fff4e6; border-left: 3px solid var(--warning-color);">
+            <strong>Selected Players:</strong>
+            <span id="selected-count">{{ players | length }}</span> / {{ players | length }}
+            <span style="margin-left: 20px; font-size: 14px; color: #666;">
+                (Minimum 5 required for 5-a-side)
+            </span>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button type="submit" class="btn btn-primary" id="continue-btn">Continue to Game Plan →</button>
+            <a href="{{ url_for('game_detail', game_id=game.id) }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+// Select/deselect all functionality
+document.getElementById('select-all').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.player-checkbox');
+    checkboxes.forEach(cb => cb.checked = this.checked);
+    updateSelectedCount();
+});
+
+// Update selected count
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.player-checkbox:checked');
+    const count = checkboxes.length;
+    document.getElementById('selected-count').textContent = count;
+
+    // Disable button if less than 5 selected
+    const continueBtn = document.getElementById('continue-btn');
+    if (count < 5) {
+        continueBtn.disabled = true;
+        continueBtn.style.opacity = '0.5';
+        continueBtn.style.cursor = 'not-allowed';
+        continueBtn.textContent = '⚠️ Need at least 5 players';
+    } else {
+        continueBtn.disabled = false;
+        continueBtn.style.opacity = '1';
+        continueBtn.style.cursor = 'pointer';
+        continueBtn.textContent = 'Continue to Game Plan →';
+    }
+}
+
+// Update count when checkboxes change
+document.querySelectorAll('.player-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateSelectedCount);
+});
+
+// Initial count update
+updateSelectedCount();
+</script>
+
+{% endblock %}
