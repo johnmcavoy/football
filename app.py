@@ -31,7 +31,10 @@ class Game(db.Model):
     completed = db.Column(db.Boolean, default=False)
     our_score = db.Column(db.Integer, default=0)
     their_score = db.Column(db.Integer, default=0)
+    man_of_the_match_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    man_of_the_match = db.relationship('Player', foreign_keys=[man_of_the_match_id])
 
 
 class PlayerPosition(db.Model):
@@ -43,6 +46,7 @@ class PlayerPosition(db.Model):
     stint_number = db.Column(db.Integer, nullable=False)  # Which rotation
     minutes_played = db.Column(db.Integer, default=0)
     goals_scored = db.Column(db.Integer, default=0)
+    performance_rating = db.Column(db.Integer, nullable=True)  # 1-10 scale, optional
 
     game = db.relationship('Game', backref='positions')
     player = db.relationship('Player', backref='positions')
@@ -199,6 +203,45 @@ def set_lineup(game_id):
                 minutes_played=0
             )
             db.session.add(position)
+
+    db.session.commit()
+    return redirect(url_for('game_detail', game_id=game_id))
+
+
+@app.route('/games/<int:game_id>/stats', methods=['POST'])
+def update_game_stats(game_id):
+    """Update post-game statistics including goals, ratings, and man of the match"""
+    game = Game.query.get_or_404(game_id)
+
+    # Update game info
+    game.our_score = int(request.form.get('our_score', 0))
+    game.their_score = int(request.form.get('their_score', 0))
+    game.completed = request.form.get('completed') == 'on'
+
+    # Update man of the match
+    man_of_match_id = request.form.get('man_of_the_match_id')
+    if man_of_match_id:
+        game.man_of_the_match_id = int(man_of_match_id)
+    else:
+        game.man_of_the_match_id = None
+
+    # Update player statistics
+    positions = PlayerPosition.query.filter_by(game_id=game_id).all()
+    for pos in positions:
+        # Update goals
+        goals_key = f'goals_{pos.id}'
+        if goals_key in request.form:
+            goals = request.form.get(goals_key)
+            pos.goals_scored = int(goals) if goals else 0
+
+        # Update performance rating (optional)
+        rating_key = f'rating_{pos.id}'
+        if rating_key in request.form:
+            rating = request.form.get(rating_key)
+            if rating and rating.strip():
+                pos.performance_rating = int(rating)
+            else:
+                pos.performance_rating = None
 
     db.session.commit()
     return redirect(url_for('game_detail', game_id=game_id))
