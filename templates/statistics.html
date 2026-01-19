@@ -15,7 +15,9 @@
         <thead>
             <tr>
                 <th>Player</th>
+                <th>Games Played</th>
                 <th>Total Minutes</th>
+                <th>Min/Game</th>
                 <th>GK</th>
                 <th>DEF</th>
                 <th>MID</th>
@@ -25,21 +27,34 @@
             </tr>
         </thead>
         <tbody>
-            {% set total_minutes_list = [] %}
+            {% set minutes_per_game_list = [] %}
             {% for stat in stats %}
-                {% set _ = total_minutes_list.append(stat.total_minutes) %}
+                {% if stat.games_available > 0 %}
+                    {% set _ = minutes_per_game_list.append(stat.minutes_per_game) %}
+                {% endif %}
             {% endfor %}
-            {% set avg_minutes = (total_minutes_list | sum) / (total_minutes_list | length) if total_minutes_list else 0 %}
+            {% set avg_minutes_per_game = (minutes_per_game_list | sum) / (minutes_per_game_list | length) if minutes_per_game_list else 0 %}
 
             {% for stat in stats %}
             <tr>
                 <td><strong>{{ stat.player.name }}</strong></td>
                 <td>
-                    <strong>{{ stat.total_minutes }}</strong> min
-                    {% if stat.total_minutes < avg_minutes * 0.8 %}
-                        <span style="color: var(--danger-color); margin-left: 5px;">↓</span>
-                    {% elif stat.total_minutes > avg_minutes * 1.2 %}
-                        <span style="color: var(--warning-color); margin-left: 5px;">↑</span>
+                    <strong>{{ stat.games_played }}</strong>
+                    {% if stat.games_available > stat.games_played %}
+                        <span style="font-size: 11px; color: #666;"> / {{ stat.games_available }}</span>
+                    {% endif %}
+                </td>
+                <td><strong>{{ stat.total_minutes }}</strong> min</td>
+                <td>
+                    {% if stat.games_available > 0 %}
+                        <strong>{{ "%.1f" | format(stat.minutes_per_game) }}</strong> min
+                        {% if stat.minutes_per_game < avg_minutes_per_game * 0.8 %}
+                            <span style="color: var(--danger-color); margin-left: 5px;">↓</span>
+                        {% elif stat.minutes_per_game > avg_minutes_per_game * 1.2 %}
+                            <span style="color: var(--warning-color); margin-left: 5px;">↑</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="color: #999;">-</span>
                     {% endif %}
                 </td>
                 <td>{{ stat.positions.get('GK', 0) }} min</td>
@@ -48,9 +63,11 @@
                 <td>{{ stat.positions.get('ATT', 0) }} min</td>
                 <td><strong>{{ stat.total_goals }}</strong></td>
                 <td>
-                    {% if stat.total_minutes < avg_minutes * 0.8 %}
+                    {% if stat.games_available == 0 %}
+                        <span class="badge badge-secondary">No Games</span>
+                    {% elif stat.minutes_per_game < avg_minutes_per_game * 0.8 %}
                         <span class="badge badge-danger">Needs More Time</span>
-                    {% elif stat.total_minutes > avg_minutes * 1.2 %}
+                    {% elif stat.minutes_per_game > avg_minutes_per_game * 1.2 %}
                         <span class="badge badge-warning">Above Average</span>
                     {% else %}
                         <span class="badge badge-success">Fair</span>
@@ -61,14 +78,17 @@
         </tbody>
     </table>
 
-    {% if avg_minutes > 0 %}
+    {% if avg_minutes_per_game > 0 %}
     <div style="margin-top: 20px; padding: 15px; background: #f0f8ff; border-left: 3px solid var(--secondary-color);">
-        <strong>Average Playing Time:</strong> {{ "%.0f" | format(avg_minutes) }} minutes per player
-        <br>
-        <span style="font-size: 13px; color: #666;">
-            Players below 80% ({{ "%.0f" | format(avg_minutes * 0.8) }} min) need more playing time.
-            Players above 120% ({{ "%.0f" | format(avg_minutes * 1.2) }} min) have played significantly more than average.
-        </span>
+        <strong>📊 Fairness Metrics:</strong>
+        <div style="margin-top: 10px; line-height: 1.8;">
+            <div><strong>Average Minutes Per Game Attended:</strong> {{ "%.1f" | format(avg_minutes_per_game) }} minutes</div>
+            <div style="font-size: 13px; color: #666; margin-top: 5px;">
+                • Players with less than {{ "%.1f" | format(avg_minutes_per_game * 0.8) }} min/game need priority playing time<br>
+                • Players with more than {{ "%.1f" | format(avg_minutes_per_game * 1.2) }} min/game have played above average<br>
+                • <strong>Note:</strong> This calculation is based on games attended, so players who show up more often naturally get more total minutes, which is fair!
+            </div>
+        </div>
     </div>
     {% endif %}
 </div>
@@ -145,17 +165,18 @@
     <ul style="padding-left: 20px; line-height: 1.8;">
         {% set needs_time = [] %}
         {% for stat in stats %}
-            {% if avg_minutes > 0 and stat.total_minutes < avg_minutes * 0.8 %}
+            {% if avg_minutes_per_game > 0 and stat.games_available > 0 and stat.minutes_per_game < avg_minutes_per_game * 0.8 %}
                 {% set _ = needs_time.append(stat.player.name) %}
             {% endif %}
         {% endfor %}
 
         {% if needs_time %}
-            <li><strong style="color: var(--danger-color);">Priority Players:</strong> {{ needs_time | join(', ') }} need more playing time in upcoming games</li>
+            <li><strong style="color: var(--danger-color);">Priority Players:</strong> {{ needs_time | join(', ') }} need more playing time in games they attend</li>
         {% else %}
-            <li><strong style="color: var(--success-color);">Great job!</strong> Playing time is fairly distributed across all players</li>
+            <li><strong style="color: var(--success-color);">Great job!</strong> Playing time is fairly distributed across all players who attend games</li>
         {% endif %}
 
+        <li><strong>Attendance-Based Fairness:</strong> Players who attend more games naturally have more total minutes - this is fair! Focus on equal minutes per game attended.</li>
         <li><strong>Position Rotation:</strong> Try to give each player experience in at least 3 different positions throughout the season</li>
         <li><strong>Regular Monitoring:</strong> Check these statistics before each game to plan fair substitutions</li>
         <li><strong>Communication:</strong> Share these stats with parents to show your commitment to fair play</li>

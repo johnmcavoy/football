@@ -62,6 +62,18 @@ class Substitution(db.Model):
     player_in = db.relationship('Player', foreign_keys=[player_in_id])
 
 
+class GameAvailability(db.Model):
+    """Tracks which players are available for each game"""
+    id = db.Column(db.Integer, primary_key=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    available = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    game = db.relationship('Game', backref='availabilities')
+    player = db.relationship('Player', backref='availabilities')
+
+
 # Routes
 @app.route('/')
 def index():
@@ -231,40 +243,70 @@ def auto_plan_game(game_id):
     all_players = Player.query.filter_by(active=True).all()
 
     if request.method == 'POST':
-        # Save the rotation plan to the database
-        # Clear existing positions for this game
-        PlayerPosition.query.filter_by(game_id=game_id).delete()
+        # Check if this is saving availability or saving the plan
+        if 'availability' in request.form:
+            # Save player availability
+            GameAvailability.query.filter_by(game_id=game_id).delete()
 
-        # Get the plan data from the form
-        import json
-        plan_data = json.loads(request.form.get('plan_data', '[]'))
+            for player in all_players:
+                available = request.form.get(f'player_{player.id}') == 'on'
+                availability = GameAvailability(
+                    game_id=game_id,
+                    player_id=player.id,
+                    available=available
+                )
+                db.session.add(availability)
 
-        for rotation in plan_data:
-            stint = rotation['stint']
-            for pos_key, player_id in rotation['positions'].items():
-                if player_id:
-                    position = PlayerPosition(
-                        game_id=game_id,
-                        player_id=int(player_id),
-                        position=pos_key,
-                        stint_number=stint,
-                        minutes_played=rotation['duration']
-                    )
-                    db.session.add(position)
+            db.session.commit()
+            # Redirect to GET to generate the plan
+            return redirect(url_for('auto_plan_game', game_id=game_id))
+        else:
+            # Save the rotation plan to the database
+            # Clear existing positions for this game
+            PlayerPosition.query.filter_by(game_id=game_id).delete()
 
-        db.session.commit()
-        return redirect(url_for('game_detail', game_id=game_id))
+            # Get the plan data from the form
+            import json
+            plan_data = json.loads(request.form.get('plan_data', '[]'))
 
-    # GET request - generate the plan
-    num_players = len(all_players)
+            for rotation in plan_data:
+                stint = rotation['stint']
+                for pos_key, player_id in rotation['positions'].items():
+                    if player_id:
+                        position = PlayerPosition(
+                            game_id=game_id,
+                            player_id=int(player_id),
+                            position=pos_key,
+                            stint_number=stint,
+                            minutes_played=rotation['duration']
+                        )
+                        db.session.add(position)
+
+            db.session.commit()
+            return redirect(url_for('game_detail', game_id=game_id))
+
+    # GET request - check if availability is set
+    availabilities = GameAvailability.query.filter_by(game_id=game_id).all()
+
+    # If availability not set, show selection page
+    if not availabilities:
+        return render_template('player_availability.html',
+                             game=game,
+                             players=all_players)
+
+    # Get available players only
+    available_player_ids = [a.player_id for a in availabilities if a.available]
+    available_players = [p for p in all_players if p.id in available_player_ids]
+
+    num_players = len(available_players)
     if num_players < 5:
         return render_template('auto_plan.html',
                              game=game,
-                             error="You need at least 5 active players to generate a rotation plan")
+                             error=f"You need at least 5 available players to generate a rotation plan. Currently only {num_players} players are marked as available. Please go back and update availability.")
 
-    # Calculate player stats for fairness
+    # Calculate player stats for fairness (use available_players for this game)
     player_stats = {}
-    for player in all_players:
+    for player in available_players:
         total_minutes = db.session.query(db.func.sum(PlayerPosition.minutes_played))\
             .filter_by(player_id=player.id).scalar() or 0
 
@@ -296,7 +338,7 @@ def auto_plan_game(game_id):
     rotation_plan = []
 
     # Track which players have played which positions in THIS game
-    game_position_tracker = {p.id: {pos: 0 for pos in positions} for p in all_players}
+    game_position_tracker = {p.id: {pos: 0 for pos in positions} for p in available_players}
 
     for stint in range(1, num_rotations + 1):
         rotation = {
@@ -308,8 +350,8 @@ def auto_plan_game(game_id):
         }
 
         # Sort players by who needs playing time most
-        available_players = sorted(
-            all_players,
+        players_sorted = sorted(
+            available_players,
             key=lambda p: (
                 player_stats[p.id]['total_minutes'],  # Historical minutes (lower is better)
                 player_stats[p.id]['times_on_pitch']  # Times in this game (lower is better)
@@ -321,7 +363,7 @@ def auto_plan_game(game_id):
 
         # First, assign goalkeeper - prioritize those who prefer it and haven't played it much
         gk_candidates = sorted(
-            available_players,
+            players_sorted,
             key=lambda p: (
                 not p.prefers_goal,  # Prefer those who like goal
                 game_position_tracker[p.id]['GK'],  # Haven't played GK in this game
@@ -336,7 +378,7 @@ def auto_plan_game(game_id):
         # Assign other positions
         for position in ['DEF1', 'DEF2', 'MID', 'ATT']:
             # Get players not yet assigned in this rotation
-            position_candidates = [p for p in available_players if p.id not in assigned_players]
+            position_candidates = [p for p in players_sorted if p.id not in assigned_players]
 
             # Sort by who needs this position most
             position_candidates = sorted(
@@ -359,7 +401,7 @@ def auto_plan_game(game_id):
 
     # Calculate bench periods for each player
     player_summary = []
-    for player in all_players:
+    for player in available_players:
         stints_playing = sum(1 for r in rotation_plan
                             if player.id in r['positions'].values())
         minutes_playing = stints_playing * rotation_interval
@@ -385,7 +427,7 @@ def auto_plan_game(game_id):
                          game=game,
                          rotation_plan=rotation_plan,
                          player_summary=player_summary,
-                         all_players=all_players,
+                         all_players=available_players,
                          game_duration=game_duration)
 
 
@@ -400,6 +442,18 @@ def statistics():
         total_minutes = db.session.query(db.func.sum(PlayerPosition.minutes_played))\
             .filter_by(player_id=player.id).scalar() or 0
 
+        # Games played (count distinct games)
+        games_played = db.session.query(db.func.count(db.func.distinct(PlayerPosition.game_id)))\
+            .filter_by(player_id=player.id).scalar() or 0
+
+        # Games available (count distinct games they were marked available)
+        games_available = db.session.query(db.func.count(db.func.distinct(GameAvailability.game_id)))\
+            .filter(GameAvailability.player_id == player.id, GameAvailability.available == True).scalar() or 0
+
+        # If no availability data exists (old games), use games_played as proxy
+        if games_available == 0 and games_played > 0:
+            games_available = games_played
+
         # Position breakdown
         position_counts = db.session.query(
             PlayerPosition.position,
@@ -410,9 +464,15 @@ def statistics():
         total_goals = db.session.query(db.func.sum(PlayerPosition.goals_scored))\
             .filter_by(player_id=player.id).scalar() or 0
 
+        # Calculate minutes per game attended
+        minutes_per_game = total_minutes / games_available if games_available > 0 else 0
+
         stats.append({
             'player': player,
             'total_minutes': total_minutes,
+            'games_played': games_played,
+            'games_available': games_available,
+            'minutes_per_game': minutes_per_game,
             'positions': dict(position_counts),
             'total_goals': total_goals
         })
